@@ -24,13 +24,14 @@ from logging import Logger
 from pathlib import Path
 from time import perf_counter
 from typing import TYPE_CHECKING, Any, Callable, Coroutine, Literal, ParamSpec, Protocol, TypeVar
+from urllib import parse
 
 import dateutil.parser
 import tomli
 import tomli_w
 import yaml
 from astral.location import Location
-from pydantic import BaseModel, ValidationError
+from pydantic import AnyHttpUrl, BaseModel, ValidationError
 from pytz import BaseTzInfo
 
 from appdaemon.parse import parse_datetime
@@ -862,7 +863,12 @@ def dt_to_str(dt: datetime, tz: tzinfo | None = None, *, round: bool = False) ->
 
 
 def convert_json(data, **kwargs):
-    return json.dumps(data, default=str, **kwargs)
+    def fallback_serializer(obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return str(obj)
+
+    return json.dumps(data, default=fallback_serializer, **kwargs)
 
 
 def get_object_size(obj, seen=None):
@@ -1167,13 +1173,11 @@ def clean_http_kwargs(val: Any) -> Any:
     return pruned
 
 
-def make_endpoint(base: str, endpoint: str) -> str:
+def make_endpoint(base: str | AnyHttpUrl, endpoint: str) -> str:
     """Formats a URL appropriately with slashes"""
-    if not endpoint.startswith(base):
-        result = f"{base}/{endpoint.strip('/')}"
-    else:
-        result = endpoint
-    return result.strip("/")
+    parsed = parse.urlparse(str(base))
+    result = parsed._replace(path=endpoint)
+    return parse.urlunparse(result)
 
 
 def unwrapped(func: Callable) -> Callable:

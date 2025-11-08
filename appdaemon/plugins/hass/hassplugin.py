@@ -459,8 +459,10 @@ class HassPlugin(PluginBase):
             **kwargs (optional): Zero or more keyword arguments. These get used as the data for the method, as
                 appropriate.
         """
-        kwargs = utils.clean_http_kwargs(kwargs)
-        url = utils.make_endpoint(f"{self.config.ha_url!s}", endpoint)
+        if method.lower() in ("get", "delete"):
+            kwargs = utils.clean_http_kwargs(kwargs)
+
+        url = utils.make_endpoint(self.config.ha_url, endpoint)
 
         try:
             self.update_perf(
@@ -475,7 +477,7 @@ class HassPlugin(PluginBase):
                 case "post":
                     http_method = functools.partial(self.session.post, json=kwargs)
                 case "delete":
-                    http_method = functools.partial(self.session.delete, json=kwargs)
+                    http_method = functools.partial(self.session.delete, params=kwargs)
                 case _:
                     raise ValueError(f"Invalid method: {method}")
 
@@ -889,8 +891,7 @@ class HassPlugin(PluginBase):
 
         @utils.warning_decorator(error_text=f"Error setting state for {entity_id}")
         async def safe_set_state(self: "HassPlugin"):
-            api_url = self.config.get_entity_api(entity_id)
-            return await self.http_method("post", api_url, state=state, attributes=attributes)
+            return await self.http_method("post", f'/api/states/{entity_id}', state=state, attributes=attributes)
 
         return await safe_set_state(self)
 
