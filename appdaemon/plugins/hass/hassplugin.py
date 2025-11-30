@@ -16,6 +16,7 @@ from typing import Any, Literal, Optional
 import aiohttp
 from aiohttp import ClientResponse, ClientResponseError, RequestInfo, WSMsgType, WebSocketError
 from pydantic import BaseModel
+from yarl import URL
 
 import appdaemon.utils as utils
 from appdaemon.appdaemon import AppDaemon
@@ -462,11 +463,11 @@ class HassPlugin(PluginBase):
         if method.lower() in ("get", "delete"):
             kwargs = utils.clean_http_kwargs(kwargs)
 
-        url = utils.make_endpoint(self.config.ha_url, endpoint)
+        url = URL(self.config.ha_url) / endpoint.lstrip("/")
 
         try:
             self.update_perf(
-                bytes_sent=len(url) + len(json.dumps(kwargs).encode("utf-8")),
+                bytes_sent=len(str(url)) + len(json.dumps(kwargs).encode("utf-8")),
                 requests_sent=1,
             )
 
@@ -891,7 +892,7 @@ class HassPlugin(PluginBase):
 
         @utils.warning_decorator(error_text=f"Error setting state for {entity_id}")
         async def safe_set_state(self: "HassPlugin"):
-            return await self.http_method("post", f'/api/states/{entity_id}', state=state, attributes=attributes)
+            return await self.http_method("post", f"/api/states/{entity_id}", state=state, attributes=attributes)
 
         return await safe_set_state(self)
 

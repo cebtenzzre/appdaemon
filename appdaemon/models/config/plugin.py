@@ -5,7 +5,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import AnyHttpUrl, BaseModel, BeforeValidator, Field, SecretBytes, SecretStr, field_validator, model_validator
 from typing_extensions import deprecated
-
+from yarl import URL
 
 from .common import CoercedPath, ParsedTimedelta
 
@@ -86,7 +86,7 @@ class StartupConditions(BaseModel):
 
 
 class HASSConfig(PluginConfig, extra="forbid"):
-    ha_url: AnyHttpUrl = Field(default="http://supervisor/core", validate_default=True) # pyright: ignore[reportAssignmentType]
+    ha_url: Annotated[str, BeforeValidator(lambda u: str(AnyHttpUrl(u)))] = Field(default="http://supervisor/core", validate_default=True)
     token: SecretStr = Field(default_factory=lambda: SecretStr(os.environ.get("SUPERVISOR_TOKEN"))) # pyright: ignore[reportArgumentType]
     ha_key: Annotated[SecretStr, deprecated("'ha_key' is deprecated. Please use long lived tokens instead")] | None = None
     appdaemon_startup_conditions: StartupConditions | None = None
@@ -117,15 +117,8 @@ class HASSConfig(PluginConfig, extra="forbid"):
         return self
 
     @property
-    def websocket_url(self) -> str:
-        return f"{self.ha_url!s}api/websocket"
-
-    @property
-    def states_api(self) -> str:
-        return f"{self.ha_url!s}api/states"
-
-    def get_entity_api(self, entity_id: str) -> str:
-        return f"{self.states_api}/{entity_id}"
+    def websocket_url(self) -> URL:
+        return URL(self.ha_url) / "api/websocket"
 
     @property
     def auth_json(self) -> dict:
